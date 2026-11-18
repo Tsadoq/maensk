@@ -31,7 +31,7 @@ This route installs the skills only, with no timer and no allow rules. The skill
 
 | Skill | What it does |
 | --- | --- |
-| `maensk-setup` | Reads the vault's rules, shows where each kind of document goes, and saves that layout after you agree. |
+| `maensk-setup` | Reads the vault's rules, shows where each kind of document goes, and saves that layout and a short digest of the rules after you agree. |
 
 ## Working on this repo
 
