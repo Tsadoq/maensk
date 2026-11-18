@@ -1,0 +1,14 @@
+{
+  "name": "maensk",
+  "owner": {
+    "name": "Matteo Villosio"
+  },
+  "description": "Matteo's engineering skills for coding agents.",
+  "plugins": [
+    {
+      "name": "maensk",
+      "source": ".",
+      "description": "Engineering skills for coding agents that keep their documents in an Obsidian vault."
+    }
+  ]
+}
