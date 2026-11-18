@@ -20,6 +20,7 @@ The settings file is `~/.config/maensk/config.json`. It is the only file this sk
    | --- | --- |
    | `glossary` | The terms of one project, in one file |
    | `adr` | Architecture decision records, one file each |
+   | `decision-record` | A short record of one decision that is hard to reverse: three sentences, no template, one file each |
    | `design-note` | A short note on how one part is built |
    | `spec` | What to build, written before the code |
    | `research` | Findings from research, one file per source or topic |
@@ -42,7 +43,7 @@ The settings file is `~/.config/maensk/config.json`. It is the only file this sk
    }
    ```
 
-   Every `path` and `template` is relative to the vault root. `layout` has one entry for each of the six kinds. The values above only show the format.
+   Every `path` and `template` is relative to the vault root. `layout` has one entry for each of the seven kinds. The values above only show the format.
 8. Only when the user asks for it, add the layout to the vault's own rules. Ask first which file and which kinds. Use only file names that exist as examples.
 9. End with a fixed report: the settings file's path, the layout table, the kinds that rest on no rule, and each line added to the vault in step 8.
 
