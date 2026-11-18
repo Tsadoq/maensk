@@ -1,0 +1,7 @@
+{
+  "name": "maensk",
+  "description": "Engineering skills for coding agents that keep their documents in an Obsidian vault.",
+  "author": { "name": "Matteo Villosio" },
+  "repository": "https://github.com/Tsadoq/maensk",
+  "license": "MIT"
+}
