@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: tools/check-words
+      - run: shellcheck install.sh tests/*.sh .githooks/*
+      - run: tests/check-words.sh
+      - run: tests/install.sh
+      - run: npm install --global @anthropic-ai/claude-code
+      - run: claude plugin validate .
+      - run: claude plugin validate .claude-plugin/marketplace.json
