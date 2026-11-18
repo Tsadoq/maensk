@@ -13,7 +13,7 @@ The settings file is `~/.config/maensk/config.json`. It is the only file this sk
 ## Steps
 
 1. Read the settings file. Its `vault` key is the vault's path. If the file or the key is missing, use the current folder when it has an `.obsidian` folder; otherwise ask for the path. If the session was not opened inside the vault, say so and stop: the vault's own rules load only there.
-2. Read the vault's rules yourself, without subagents: `AGENTS.md` and `CLAUDE.md` at the root, each file they name as the authority for paths, naming or templates, and the folder tree two levels deep. Then list the files of the two projects that changed most recently. Do not survey the other projects.
+2. Read the vault's rules yourself, without subagents: `AGENTS.md` and `CLAUDE.md` at the root, each file they import or name as the authority for paths, naming, templates or wording, and the folder tree two levels deep. Then list the files of the two projects that changed most recently. Do not survey the other projects.
 3. Decide where each kind of document goes.
 
    | Kind | What it is |
@@ -26,8 +26,8 @@ The settings file is `~/.config/maensk/config.json`. It is the only file this sk
    | `lessons` | What was learned in one project, in one file |
 
    Each kind gets a path from the vault root that ends in a file name, and the vault's template for that kind when it has one. Use `<project>` for the project's folder name, `<name>` for the name the project's notes carry in their titles, and `<title>`, `<number>` and `<date>` where the file name needs them. A stated rule of the vault comes first. Where the rules say nothing, do what the existing projects do. Where they also show nothing, put the glossary beside the project's main note and each other kind in its own folder under the project. Never choose a folder the rules close to agents.
-4. Write the rules digest: what a skill must follow when it writes a note in this vault, such as file names, frontmatter, links, wording, and anything the vault requires after a write. One sentence for each rule, with the file it comes from in brackets, twenty rules at most. Leave out where notes go; the layout holds that. The other skills read this digest and not the vault's rule files.
-5. Show the layout in one table: kind, path, template, and the rule or the example each row comes from. Under it show the digest and the kinds you found no rule for. Then stop and wait.
+4. Write the rules digest: what a skill must follow when it writes a note in this vault. Cover each of these topics: file names, frontmatter, links, wording, abbreviations, language, and what the vault requires after a write. One sentence for each rule, with the file it comes from in brackets, twenty rules at most. Leave out where notes go; the layout holds that. The other skills read this digest and not the vault's rule files.
+5. Show the layout in one table: kind, path, template, and the rule or the example each row comes from. Under it show the digest, then the kinds and the digest topics you found no rule for. Then stop and wait.
 6. Change the layout and the digest as the user asks and show them again. Repeat until the user says yes.
 7. Write the settings file. Keep every key it already has and set these:
 
