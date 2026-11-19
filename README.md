@@ -35,6 +35,11 @@ This route installs the skills only, with no timer and no allow rules. The skill
 | `grill-with-docs` | Settles the open decisions of an idea or a plan with you before any code is written. It looks up the facts itself and gives each question its options with their costs and no recommended answer. It writes settled terms to the glossary and offers a three-sentence decision record for a decision that is hard to reverse. Say `shallow` for a round that asks only the large decisions. |
 | `domain-design` | Settles one plain word for each thing in a project and keeps the project's glossary. `grill-with-docs` loads it. |
 | `to-spec` | Turns decisions that are settled into a one-page spec in the vault, which a reader who was not in the conversation can follow. It adds no decision and marks each part that nothing decided. On request it publishes the spec to an issue tracker, after you have read it and said yes. |
+| `probe` | Settles a claim with the smallest real run that could prove it wrong, in a background subagent, and reports what it ran, what it saw and what the run does not show. It also builds a throwaway version of a design to find what the design misses, and keeps that build until you delete it. |
+
+### `probe` runs code
+
+`probe` runs commands that the agent wrote a moment before, in a folder under the temp folder, and the deploy or test commands that your repo documents. Nothing confines them unless you turn on Claude Code's sandbox: run `/sandbox`, or set `"sandbox": {"enabled": true}` in `~/.claude/settings.json`. On macOS it needs nothing more. On Linux it needs `bubblewrap` and `socat`, and on Ubuntu also an AppArmor profile for `bwrap`; the [sandbox page](https://code.claude.com/docs/en/sandboxing) has the steps. pi has no sandbox.
 
 ## Working on this repo
 
@@ -50,7 +55,7 @@ The hooks run `tools/check-words` on the files and on the commit message. It fai
 claude plugin eval . --scaffold --allow-tools Write Edit --no-publish
 ```
 
-The cases in `evals/` run each skill against a toy repo and a toy vault, with and without the plugin. Each run is a model call on your account.
+The cases in `evals/` run each skill against a toy repo and a toy vault, with and without the plugin. Each run is a model call on your account. The cases of `probe` need the shell: add `Bash` to `--allow-tools`. Where Claude Code's sandbox does not work, the eval then refuses every case, and without `Bash` the cases of `probe` fail.
 
 ## Licence
 
