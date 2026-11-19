@@ -34,6 +34,7 @@ This route installs the skills only, with no timer and no allow rules. The skill
 | `maensk-setup` | Reads the vault's rules, shows where each kind of document goes, and saves that layout and a short digest of the rules after you agree. |
 | `grill-with-docs` | Settles the open decisions of an idea or a plan with you before any code is written. It looks up the facts itself and gives each question its options with their costs and no recommended answer. It writes settled terms to the glossary and offers a three-sentence decision record for a decision that is hard to reverse. Say `shallow` for a round that asks only the large decisions. |
 | `domain-design` | Settles one plain word for each thing in a project and keeps the project's glossary. `grill-with-docs` loads it. |
+| `to-spec` | Turns decisions that are settled into a one-page spec in the vault, which a reader who was not in the conversation can follow. It adds no decision and marks each part that nothing decided. On request it publishes the spec to an issue tracker, after you have read it and said yes. |
 
 ## Working on this repo
 
@@ -55,4 +56,4 @@ The cases in `evals/` run each skill against a toy repo and a toy vault, with an
 
 MIT
 
-`grill-with-docs` and `domain-design` are based on the `grilling` and `domain-modeling` skills of [mattpocock/skills](https://github.com/mattpocock/skills) (MIT, Copyright (c) 2026 Matt Pocock). The three tests for a decision record are taken from there.
+`grill-with-docs`, `domain-design` and `to-spec` are based on the `grilling`, `domain-modeling` and `to-spec` skills of [mattpocock/skills](https://github.com/mattpocock/skills) (MIT, Copyright (c) 2026 Matt Pocock). The three tests for a decision record are taken from there.
