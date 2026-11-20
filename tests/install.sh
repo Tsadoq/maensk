@@ -27,10 +27,11 @@ commit() {
 }
 
 mkdir -p "$HOME/.claude" "$tmp/vault" "$tmp/repos" "$tmp/bin" "$origin"
-for stub in systemctl launchctl; do
+for stub in systemctl launchctl pi; do
   printf '#!/bin/sh\necho "$@" >>"%s/%s.log"\n' "$tmp" "$stub" >"$tmp/bin/$stub"
   chmod +x "$tmp/bin/$stub"
 done
+printf '#!/bin/sh\n[ -t 0 ] || cat >/dev/null\necho "$@" >>"%s/pi.log"\n' "$tmp" >"$tmp/bin/pi"
 git init -q -b main "$origin"
 cp -R "$root/install.sh" "$root/skills" "$origin/"
 commit first
@@ -40,13 +41,25 @@ chmod 600 "$settings"
 bash -s -- --pi --vault "$tmp/vault" <"$origin/install.sh" >/dev/null
 [ -f "$HOME/.agents/skills/maensk-setup/SKILL.md" ] || fail "piped install copied no skill"
 [ ! -e "$HOME/.claude/skills" ] || fail "piped install for pi wrote Claude Code skills"
+[ ! -e "$tmp/pi.log" ] || fail "installed the pi viewer without --pi-viewer"
 
 if script --version >/dev/null 2>&1; then
-  printf 'y\nn\n%s\n\n' "$tmp/vault" | script -qec "$origin/install.sh" /dev/null >/dev/null
+  printf 'y\ny\nn\n%s\n\n' "$tmp/vault" | script -qec "$origin/install.sh" /dev/null >/dev/null
   [ -f "$HOME/.claude/skills/maensk-setup/SKILL.md" ] || fail "answered install copied no skill"
   [ ! -e "$tmp/vault/.claude" ] || fail "an empty repos answer still wrote vault settings"
   grep -q '"repos": null' "$config" || fail "an empty repos answer was not recorded"
+  [ ! -e "$tmp/pi.log" ] || fail "installed the pi viewer after a no"
 fi
+
+mkdir -p "$XDG_CONFIG_HOME/git"
+printf '*.swp' >"$XDG_CONFIG_HOME/git/ignore"
+"$origin/install.sh" --pi --pi-viewer --vault "$tmp/vault" >/dev/null
+"$origin/install.sh" --pi --pi-viewer --vault "$tmp/vault" >/dev/null
+grep -qx "install npm:@nicknisi/pi-artifacts" "$tmp/pi.log" || fail "--pi-viewer did not install the pi viewer"
+[ "$(cat "$XDG_CONFIG_HOME/git/ignore")" = "$(printf '*.swp\n.pi/artifacts/')" ] || fail "the pi pages folder is not in the git ignore file exactly once"
+rm "$config"
+bash -s -- --pi --pi-viewer --vault "$tmp/vault" <"$origin/install.sh" >/dev/null
+[ -f "$config" ] || fail "a piped install with --pi-viewer stopped at pi install"
 
 "$origin/install.sh" --claude --pi --vault "$tmp/vault" --repos "$tmp/repos" >/dev/null
 python3 - "$tmp" <<'PY'

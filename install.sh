@@ -9,6 +9,7 @@ CLAUDE_SKILLS="$HOME/.claude/skills"
 PI_SKILLS="$HOME/.agents/skills"
 MARKER=".maensk"
 LABEL="io.github.tsadoq.maensk-update"
+PI_VIEWER="npm:@nicknisi/pi-artifacts"
 
 usage() {
   cat <<'EOF'
@@ -22,6 +23,9 @@ Installs the maensk skills and keeps them updated.
 Answers as flags, for a run with no questions:
   --claude       install for Claude Code (~/.claude/skills)
   --pi           install for pi (~/.agents/skills)
+  --pi-viewer    with --pi: also install the pi package that shows explainer pages
+                 in the browser (@nicknisi/pi-artifacts), and add the folder where
+                 it keeps them, .pi/artifacts/, to your global git ignore file
   --vault DIR    the Obsidian vault the skills keep their documents in (required)
   --repos DIR    the folder that holds your code repos; a session opened in the
                  vault may then write there. Without it, each repo is added when
@@ -133,6 +137,20 @@ PY
   echo "wrote $CONFIG"
 }
 
+ignore_pages() {
+  local file
+  file="$(git config --global core.excludesFile || true)"
+  case "$file" in
+    "") file="${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore" ;;
+    \~/*) file="$HOME/${file#\~/}" ;;
+  esac
+  if grep -qxF ".pi/artifacts/" "$file" 2>/dev/null; then return; fi
+  mkdir -p "$(dirname "$file")"
+  if [ -s "$file" ] && [ -n "$(tail -c1 "$file")" ]; then echo >>"$file"; fi
+  echo ".pi/artifacts/" >>"$file"
+  echo "added .pi/artifacts/ to $file"
+}
+
 install_timer() {
   local units="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
   local plist="$HOME/Library/LaunchAgents/$LABEL.plist"
@@ -202,7 +220,7 @@ EOF
 }
 
 main() {
-  local here="" update=0 claude=0 pi=0 vault="" repos="" questions=0 dest src
+  local here="" update=0 claude=0 pi=0 viewer=0 vault="" repos="" questions=0 dest src
   if [ -f "${BASH_SOURCE[0]:-}" ]; then
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   fi
@@ -212,6 +230,7 @@ main() {
       --update) update=1 ;;
       --claude) claude=1 ;;
       --pi) pi=1 ;;
+      --pi-viewer) viewer=1 ;;
       --vault | --repos)
         [ $# -ge 2 ] || die "$1 needs a folder"
         if [ "$1" = --vault ]; then vault="$2"; else repos="$2"; fi
@@ -242,6 +261,10 @@ main() {
   if [ "$questions" = 1 ]; then
     if yes_no "Install for Claude Code?" "$(found claude)"; then claude=1; fi
     if yes_no "Install for pi?" "$(found pi)"; then pi=1; fi
+    if [ "$pi" = 1 ]; then
+      echo "explainer shows its pages in pi through the package @nicknisi/pi-artifacts. It keeps them in .pi/artifacts/, which this script adds to your global git ignore file. Without it, explainer only writes the page as a file." >/dev/tty
+      if yes_no "Install that package?" y; then viewer=1; fi
+    fi
     ask "Path of your Obsidian vault:"
     vault="$REPLY"
     if [ "$claude" = 1 ]; then
@@ -264,6 +287,14 @@ main() {
     [ -z "$repos" ] || allow "$vault/.claude/settings.local.json" "Edit(/$repos/**)"
   fi
   [ "$pi" = 0 ] || install_skills "$src" "$PI_SKILLS"
+  if [ "$pi$viewer" = 11 ]; then
+    if command -v pi >/dev/null && pi install "$PI_VIEWER"; then
+      echo "installed the pi package $PI_VIEWER"
+      ignore_pages
+    else
+      echo "could not install $PI_VIEWER: run 'pi install $PI_VIEWER' later and add .pi/artifacts/ to your global git ignore file; until then explainer in pi only writes files"
+    fi
+  fi
   write_config "$vault" "$repos"
   install_timer
   echo "Next: open your agent in $vault and run /maensk-setup (in pi: /skill:maensk-setup)."
