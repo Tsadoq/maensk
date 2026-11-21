@@ -23,10 +23,11 @@ The settings file is `~/.config/maensk/config.json`. It is the only file this sk
    | `decision-record` | A short record of one decision that is hard to reverse: three sentences, no template, one file each |
    | `design-note` | A short note on how one part is built |
    | `spec` | What to build, written before the code |
+   | `plan` | The tasks that build one job, in a folder with one file for each task |
    | `research` | Findings from research, one file per source or topic |
    | `lessons` | What was learned in one project, in one file |
 
-   Each kind gets a path from the vault root that ends in a file name, and the vault's template for that kind when it has one. Use `<project>` for the project's folder name, `<name>` for the name the project's notes carry in their titles, and `<title>`, `<number>` and `<date>` where the file name needs them. A stated rule of the vault comes first. Where the rules say nothing, do what the existing projects do. Where they also show nothing, put the glossary beside the project's main note and each other kind in its own folder under the project. Never choose a folder the rules close to agents.
+   Each kind gets a path from the vault root that ends in a file name, and the vault's template for that kind when it has one. The path of `plan` ends in a folder, `<title>/`, and goes beside the spec. Use `<project>` for the project's folder name, `<name>` for the name the project's notes carry in their titles, and `<title>`, `<number>` and `<date>` where the file name needs them. A stated rule of the vault comes first. Where the rules say nothing, do what the existing projects do. Where they also show nothing, put the glossary beside the project's main note and each other kind in its own folder under the project. Never choose a folder the rules close to agents.
 4. Write the rules digest: what a skill must follow when it writes a note in this vault. Cover each of these topics: file names, frontmatter, links, wording, abbreviations, language, and what the vault requires after a write. One sentence for each rule, with the file it comes from in brackets, twenty rules at most. Leave out where notes go; the layout holds that. The other skills read this digest and not the vault's rule files.
 5. Show the layout in one table: kind, path, template, and the rule or the example each row comes from. Under it show the digest, then the kinds and the digest topics you found no rule for. Then stop and wait.
 6. Change the layout and the digest as the user asks and show them again. Repeat until the user says yes.
@@ -43,7 +44,7 @@ The settings file is `~/.config/maensk/config.json`. It is the only file this sk
    }
    ```
 
-   Every `path` and `template` is relative to the vault root. `layout` has one entry for each of the seven kinds. The values above only show the format.
+   Every `path` and `template` is relative to the vault root. `layout` has one entry for each of the eight kinds. The values above only show the format.
 8. Only when the user asks for it, add the layout to the vault's own rules. Ask first which file and which kinds. Use only file names that exist as examples.
 9. End with a fixed report: the settings file's path, the layout table, the kinds that rest on no rule, and each line added to the vault in step 8.
 
