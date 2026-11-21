@@ -1,6 +1,6 @@
 # maensk
 
-Matteo Engineering Skills: skills for coding agents. They keep their documents (glossary, decision records, design notes, specs) in an Obsidian vault and not in the code repo.
+Matteo Engineering Skills: skills for coding agents. They keep their documents (glossary, decision records, design notes, specs, plans) in an Obsidian vault and not in the code repo.
 
 ## Install
 
@@ -37,6 +37,7 @@ This route installs the skills only, with no timer and no allow rules. The skill
 | `domain-design` | Settles one plain word for each thing in a project and keeps the project's glossary. `grill-with-docs` loads it. |
 | `to-spec` | Turns decisions that are settled into a one-page spec in the vault, which a reader who was not in the conversation can follow. It adds no decision and marks each part that nothing decided. On request it publishes the spec to an issue tracker, after you have read it and said yes. |
 | `probe` | Settles a claim with the smallest real run that could prove it wrong, in a background subagent, and reports what it ran, what it saw and what the run does not show. It also builds a throwaway version of a design to find what the design misses, and keeps that build until you delete it. |
+| `super-plan` | Turns a spec, a brief or a finished discussion into a plan: a folder in the vault with one file for each small task, written so that an agent with no context can build it. It asks each choice about how to build as a question with options and costs, checks each pick with `probe`, has critic agents review the plan, shows it as an `explainer` page and waits for your approval. Say `autopilot` and it settles the choices itself and records each one. |
 | `explainer` | Builds one visual page that shows how something works or compares options: one step at a time, on real example data, with little text. A subagent builds it and checks it in a headless Chrome or Chromium before you see it. Claude Code publishes it as a private claude.ai artifact; pi shows it through `@nicknisi/pi-artifacts`. |
 
 ### `probe` runs code
@@ -57,7 +58,7 @@ The hooks run `tools/check-words` on the files and on the commit message. It fai
 claude plugin eval . --scaffold --allow-tools Write Edit --no-publish
 ```
 
-The cases in `evals/` run each skill against a toy repo and a toy vault, with and without the plugin. Each run is a model call on your account. The cases of `probe` and `explainer` need the shell: add `Bash` to `--allow-tools`. Where Claude Code's sandbox does not work, the eval then refuses every case, and without `Bash` the cases of `probe` fail.
+The cases in `evals/` run each skill against a toy repo and a toy vault, with and without the plugin. Each run is a model call on your account. The cases of `probe`, `explainer` and `super-plan` need the shell: add `Bash` to `--allow-tools`. Where Claude Code's sandbox does not work, the eval then refuses every case, and without `Bash` the cases of `probe` and the `super-plan` cases that write a plan fail.
 
 ## Licence
 

@@ -23,7 +23,7 @@ The settings file is `~/.config/maensk/config.json`. Its `vault` key is the vaul
 
 - Problem: what the people who use the system cannot do today.
 - Solution: what changes, in two or three sentences.
-- Requirements: few, one sentence each with one "shall", on behaviour a person can see, each with its acceptance criterion in bold. Each one restates a decision; a decision with two behaviours gives two requirements. A criterion uses no number or limit that was not decided.
+- Requirements: few, numbered R1, R2 and so on, one sentence each with one "shall", on behaviour a person can see, each with its acceptance criterion in bold. Each one restates a decision; a decision with two behaviours gives two requirements. A criterion uses no number or limit that was not decided.
 - Decisions: one line each. Add a reason only when one was given; never write one yourself. Name the ADR or decision record that a decision follows or overrides.
 - Testing: how it will be tested, as decided.
 - Out of scope.
