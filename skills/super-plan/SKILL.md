@@ -63,6 +63,7 @@ The folder is the layout's path. For `<title>` use a short name of the job in lo
 # CSV export of the reports page
 
 Status: draft
+Repo: ~/gits/reports-app
 Input: [[Reports CSV Export Spec]]
 Goal: A member of finance gets the report rows of the team as one CSV file.
 Scope: in, the export and its limit. Out, Excel files and exports on a schedule.
@@ -86,7 +87,7 @@ Scope: in, the export and its limit. Out, Excel files and exports on a schedule.
 2. Task 2
 ```
 
-The R ids are the spec's. With no spec, list what the people who use the system get and number it yourself. A G id is a gap that was settled in planning; a design choice has no row here. `Rounds` lists the tasks that can run together.
+`Repo:` is the path of the checkout the plan is built from. The R ids are the spec's. With no spec, list what the people who use the system get and number it yourself. A G id is a gap that was settled in planning; a design choice has no row here. `Rounds` lists the tasks that can run together.
 
 One file for each task, `tasks/NN-<short name>.md`, that a builder can follow with no other file:
 
@@ -134,7 +135,7 @@ Each record of `probe` as it came back. For a build: its path, what it found, an
 - Task 2 named no file for its test. Fixed in task 2.
 ```
 
-`super-implement` builds only a plan with the status `ready`, and writes its own notes to `run.md` in the plan folder. The plan's files stay as approved.
+`super-implement` builds only a plan with the status `ready`, and writes its own notes to `run.md` in the plan folder. The plan's files stay as approved, but for the status line, which it sets to `done` when every task is built.
 
 ## Red flags
 
