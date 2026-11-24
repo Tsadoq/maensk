@@ -27,7 +27,7 @@ commit() {
 }
 
 mkdir -p "$HOME/.claude" "$tmp/vault" "$tmp/repos" "$tmp/bin" "$origin"
-for stub in systemctl launchctl pi; do
+for stub in systemctl launchctl pi pipx cargo; do
   printf '#!/bin/sh\necho "$@" >>"%s/%s.log"\n' "$tmp" "$stub" >"$tmp/bin/$stub"
   chmod +x "$tmp/bin/$stub"
 done
@@ -41,14 +41,15 @@ chmod 600 "$settings"
 bash -s -- --pi --vault "$tmp/vault" <"$origin/install.sh" >/dev/null
 [ -f "$HOME/.agents/skills/maensk-setup/SKILL.md" ] || fail "piped install copied no skill"
 [ ! -e "$HOME/.claude/skills" ] || fail "piped install for pi wrote Claude Code skills"
-[ ! -e "$tmp/pi.log" ] || fail "installed the pi viewer without --pi-viewer"
+[ "$(cat "$tmp/pi.log")" = "install npm:@tintinweb/pi-subagents" ] || fail "a pi install did not install pi-subagents alone"
 
 if script --version >/dev/null 2>&1; then
-  printf 'y\ny\nn\n%s\n\n' "$tmp/vault" | script -qec "$origin/install.sh" /dev/null >/dev/null
+  printf 'y\ny\nn\n%s\n\n\n' "$tmp/vault" | script -qec "$origin/install.sh" /dev/null >/dev/null
   [ -f "$HOME/.claude/skills/maensk-setup/SKILL.md" ] || fail "answered install copied no skill"
   [ ! -e "$tmp/vault/.claude" ] || fail "an empty repos answer still wrote vault settings"
   grep -q '"repos": null' "$config" || fail "an empty repos answer was not recorded"
-  [ ! -e "$tmp/pi.log" ] || fail "installed the pi viewer after a no"
+  ! grep -q pi-artifacts "$tmp/pi.log" || fail "installed the pi viewer after a no"
+  ! grep -q mutation "$config" || fail "an empty languages answer wrote a mutation tool"
 fi
 
 mkdir -p "$XDG_CONFIG_HOME/git"
@@ -100,6 +101,19 @@ case "$(uname -s)" in
     grep -q bootstrap "$tmp/launchctl.log" || fail "agent not loaded"
     ;;
 esac
+
+"$origin/install.sh" --claude --vault "$tmp/vault" --repos "$tmp/repos" --mutation "python,rust" >/dev/null
+grep -qx "install mutmut" "$tmp/pipx.log" || fail "--mutation python did not install mutmut"
+grep -qx "install --locked cargo-mutants" "$tmp/cargo.log" || fail "--mutation rust did not install cargo-mutants"
+python3 - "$config" <<'PY'
+import json
+import sys
+
+config = json.loads(open(sys.argv[1]).read())
+assert config.pop("mutation") == {"python": "mutmut", "rust": "cargo mutants"}, config
+open(sys.argv[1], "w").write(json.dumps(config, indent=2) + "\n")
+PY
+if "$origin/install.sh" --claude --vault "$tmp/vault" --mutation cobol >/dev/null 2>&1; then fail "accepted a language with no mutation tool"; fi
 
 cp "$settings" "$tmp/settings.before"
 cp "$config" "$tmp/config.before"

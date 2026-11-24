@@ -10,6 +10,8 @@ PI_SKILLS="$HOME/.agents/skills"
 MARKER=".maensk"
 LABEL="io.github.tsadoq.maensk-update"
 PI_VIEWER="npm:@nicknisi/pi-artifacts"
+PI_SUBAGENTS="npm:@tintinweb/pi-subagents"
+LANGUAGES="python rust go javascript"
 
 usage() {
   cat <<'EOF'
@@ -26,6 +28,10 @@ Answers as flags, for a run with no questions:
   --pi-viewer    with --pi: also install the pi package that shows explainer pages
                  in the browser (@nicknisi/pi-artifacts), and add the folder where
                  it keeps them, .pi/artifacts/, to your global git ignore file
+  --mutation "LANGS"
+                 install a mutation tool for each of these languages, which
+                 super-implement runs on each task: python (mutmut), rust
+                 (cargo-mutants), go (gremlins), javascript (Stryker)
   --vault DIR    the Obsidian vault the skills keep their documents in (required)
   --repos DIR    the folder that holds your code repos; a session opened in the
                  vault may then write there. Without it, each repo is added when
@@ -122,9 +128,30 @@ except (ValueError, AttributeError, TypeError):
 PY
 }
 
+mutation_tool() {
+  case "$1" in
+    python) echo "mutmut" ;;
+    rust) echo "cargo mutants" ;;
+    go) echo "gremlins unleash" ;;
+    javascript) echo "stryker run" ;;
+    *) return 1 ;;
+  esac
+}
+
+install_mutation() {
+  case "$1" in
+    python)
+      if command -v pipx >/dev/null; then pipx install mutmut; else python3 -m pip install --user mutmut; fi
+      ;;
+    rust) cargo install --locked cargo-mutants ;;
+    go) go install github.com/go-gremlins/gremlins/cmd/gremlins@latest ;;
+    javascript) npm install --global @stryker-mutator/core ;;
+  esac
+}
+
 write_config() {
   mkdir -p "$(dirname "$CONFIG")"
-  python3 - "$CONFIG" "$1" "$2" <<'PY'
+  python3 - "$CONFIG" "$@" <<'PY'
 import json
 import pathlib
 import sys
@@ -132,6 +159,9 @@ import sys
 path, vault, repos = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
 data = json.loads(path.read_text()) if path.exists() else {}
 data.update(vault=vault, repos=repos or None)
+tools = dict(pair.split("=", 1) for pair in sys.argv[4:])
+if tools:
+    data.setdefault("mutation", {}).update(tools)
 path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 PY
   echo "wrote $CONFIG"
@@ -220,7 +250,8 @@ EOF
 }
 
 main() {
-  local here="" update=0 claude=0 pi=0 viewer=0 vault="" repos="" questions=0 dest src
+  local here="" update=0 claude=0 pi=0 viewer=0 vault="" repos="" languages="" questions=0 dest src lang
+  local tools=()
   if [ -f "${BASH_SOURCE[0]:-}" ]; then
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   fi
@@ -231,6 +262,11 @@ main() {
       --claude) claude=1 ;;
       --pi) pi=1 ;;
       --pi-viewer) viewer=1 ;;
+      --mutation)
+        [ $# -ge 2 ] || die "$1 needs a list of languages"
+        languages="$2"
+        shift
+        ;;
       --vault | --repos)
         [ $# -ge 2 ] || die "$1 needs a folder"
         if [ "$1" = --vault ]; then vault="$2"; else repos="$2"; fi
@@ -272,7 +308,14 @@ main() {
       ask "Folder that holds your repos (empty: add each repo when a skill first needs it):"
       repos="$REPLY"
     fi
+    echo "super-implement runs a mutation tool on each task, to see that its tests fail on broken code." >/dev/tty
+    ask "Languages to install one for ($LANGUAGES; empty: none):"
+    languages="$REPLY"
   fi
+  languages="${languages//,/ }"
+  for lang in $languages; do
+    mutation_tool "$lang" >/dev/null || die "no mutation tool for $lang; choose from: $LANGUAGES"
+  done
   [ "$claude$pi" != 00 ] || die "nothing to install for: choose Claude Code or pi"
   vault="$(absolute "$vault")"
   [ -z "$repos" ] || repos="$(absolute "$repos")"
@@ -286,7 +329,14 @@ main() {
     allow "$HOME/.claude/settings.json" "Edit(/$(dirname "$CONFIG")/**)"
     [ -z "$repos" ] || allow "$vault/.claude/settings.local.json" "Edit(/$repos/**)"
   fi
-  [ "$pi" = 0 ] || install_skills "$src" "$PI_SKILLS"
+  if [ "$pi" = 1 ]; then
+    install_skills "$src" "$PI_SKILLS"
+    if command -v pi >/dev/null && pi install "$PI_SUBAGENTS"; then
+      echo "installed the pi package $PI_SUBAGENTS"
+    else
+      echo "could not install $PI_SUBAGENTS: run 'pi install $PI_SUBAGENTS' later; super-implement in pi needs it"
+    fi
+  fi
   if [ "$pi$viewer" = 11 ]; then
     if command -v pi >/dev/null && pi install "$PI_VIEWER"; then
       echo "installed the pi package $PI_VIEWER"
@@ -295,7 +345,15 @@ main() {
       echo "could not install $PI_VIEWER: run 'pi install $PI_VIEWER' later and add .pi/artifacts/ to your global git ignore file; until then explainer in pi only writes files"
     fi
   fi
-  write_config "$vault" "$repos"
+  for lang in $languages; do
+    if install_mutation "$lang" >/dev/null 2>&1; then
+      tools+=("$lang=$(mutation_tool "$lang")")
+      echo "installed the mutation tool for $lang: $(mutation_tool "$lang")"
+    else
+      echo "could not install the mutation tool for $lang; super-implement goes on without one for $lang"
+    fi
+  done
+  write_config "$vault" "$repos" ${tools[@]+"${tools[@]}"}
   install_timer
   echo "Next: open your agent in $vault and run /maensk-setup (in pi: /skill:maensk-setup)."
 }
