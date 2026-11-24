@@ -12,6 +12,12 @@ LABEL="io.github.tsadoq.maensk-update"
 PI_VIEWER="npm:@nicknisi/pi-artifacts"
 PI_SUBAGENTS="npm:@tintinweb/pi-subagents"
 LANGUAGES="python rust go javascript"
+PI_WEB_SEARCH="npm:pi-web-search"
+REVIEWERS=(
+  "https://github.com/anthropics/knowledge-work-plugins.git 5e504ae11498f2b8daa30d86b7dab97b2ecd8092 engineering/skills/code-review code-review"
+  "https://github.com/getsentry/skills.git a582c51ee29d0f35e6ac321340796f77d43da733 skills/security-review security-review"
+  "https://github.com/DietrichGebert/ponytail.git ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10 skills/ponytail-review ponytail-review"
+)
 
 usage() {
   cat <<'EOF'
@@ -32,6 +38,9 @@ Answers as flags, for a run with no questions:
                  install a mutation tool for each of these languages, which
                  super-implement runs on each task: python (mutmut), rust
                  (cargo-mutants), go (gremlins), javascript (Stryker)
+  --review-tools copy the reviewer skills that super-review runs, each at a
+                 pinned commit, into ~/.config/maensk/reviewers/; with --pi,
+                 also install the pi package pi-web-search
   --vault DIR    the Obsidian vault the skills keep their documents in (required)
   --repos DIR    the folder that holds your code repos; a session opened in the
                  vault may then write there. Without it, each repo is added when
@@ -100,6 +109,34 @@ install_skills() {
     touch "$dest/$name/$MARKER"
   done
   echo "installed the skills in $dest"
+}
+
+install_reviewers() {
+  local existing="$1" dest entry url sha sub name temp file
+  dest="$(dirname "$CONFIG")/reviewers"
+  for entry in "${REVIEWERS[@]}"; do
+    read -r url sha sub name <<<"$entry"
+    [ "$existing" = 0 ] || [ -d "$dest/$name" ] || continue
+    temp="$(mktemp -d)"
+    if ! { git -C "$temp" init -q &&
+      git -C "$temp" remote add origin "$url" &&
+      git -C "$temp" sparse-checkout set --no-cone "/$sub/" "/LICENSE*" >/dev/null &&
+      git -C "$temp" fetch -q --depth 1 --filter=blob:none origin "$sha" &&
+      git -C "$temp" checkout -q FETCH_HEAD &&
+      [ -d "$temp/$sub" ]; }; then
+      rm -rf "$temp"
+      echo "could not fetch the reviewer skill $name from $url: run install.sh again with --review-tools later; super-review needs it"
+      continue
+    fi
+    rm -rf "${dest:?}/$name"
+    mkdir -p "$dest/$name"
+    cp -R "$temp/$sub/." "$dest/$name/"
+    if ! compgen -G "$dest/$name/LICENSE*" >/dev/null; then
+      for file in "$temp"/LICENSE*; do cp "$file" "$dest/$name/"; done
+    fi
+    rm -rf "$temp"
+    echo "installed the reviewer skill $name in $dest/$name"
+  done
 }
 
 allow() {
@@ -250,7 +287,7 @@ EOF
 }
 
 main() {
-  local here="" update=0 claude=0 pi=0 viewer=0 vault="" repos="" languages="" questions=0 dest src lang
+  local here="" update=0 claude=0 pi=0 viewer=0 review=0 vault="" repos="" languages="" questions=0 dest src lang
   local tools=()
   if [ -f "${BASH_SOURCE[0]:-}" ]; then
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -262,6 +299,7 @@ main() {
       --claude) claude=1 ;;
       --pi) pi=1 ;;
       --pi-viewer) viewer=1 ;;
+      --review-tools) review=1 ;;
       --mutation)
         [ $# -ge 2 ] || die "$1 needs a list of languages"
         languages="$2"
@@ -290,6 +328,7 @@ main() {
     for dest in "$CLAUDE_SKILLS" "$PI_SKILLS"; do
       if compgen -G "$dest/*/$MARKER" >/dev/null; then install_skills "$CLONE" "$dest"; fi
     done
+    install_reviewers 1
     exit 0
   fi
 
@@ -311,6 +350,8 @@ main() {
     echo "super-implement runs a mutation tool on each task, to see that its tests fail on broken code." >/dev/tty
     ask "Languages to install one for ($LANGUAGES; empty: none):"
     languages="$REPLY"
+    echo "super-review runs three reviewer skills from GitHub, each at a pinned commit." >/dev/tty
+    if yes_no "Install them?" n; then review=1; fi
   fi
   languages="${languages//,/ }"
   for lang in $languages; do
@@ -343,6 +384,16 @@ main() {
       ignore_pages
     else
       echo "could not install $PI_VIEWER: run 'pi install $PI_VIEWER' later and add .pi/artifacts/ to your global git ignore file; until then explainer in pi only writes files"
+    fi
+  fi
+  if [ "$review" = 1 ]; then
+    install_reviewers 0
+  fi
+  if [ "$pi$review" = 11 ]; then
+    if command -v pi >/dev/null && pi install "$PI_WEB_SEARCH"; then
+      echo "installed the pi package $PI_WEB_SEARCH"
+    else
+      echo "could not install $PI_WEB_SEARCH: run 'pi install $PI_WEB_SEARCH' later; super-review in pi needs it to check claims on the web"
     fi
   fi
   for lang in $languages; do
