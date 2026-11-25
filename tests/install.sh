@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(cd "$(mktemp -d)" && pwd -P)"
