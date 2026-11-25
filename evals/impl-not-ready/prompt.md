@@ -5,4 +5,4 @@ allowed_tools: [Bash, Read, Write, Edit, Glob, Grep, Skill, Agent, SendMessage, 
 append_system_prompt: "The home folder of this session is the parent folder of the working folder."
 ---
 
-Use `super-implement` on the plan `vault/projects/reports-app/plan/csv-export`.
+Use `super-implement` on the plan `vault/projects/reports-app/features/csv-export/plans/csv-export`.

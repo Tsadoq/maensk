@@ -109,7 +109,7 @@ PY
 git -C "$W" add -A
 git -C "$W" commit -qm "Write report rows as CSV text"
 c2=$(git -C "$W" rev-parse --short HEAD)
-cat > vault/projects/reports-app/plan/csv-export/run.md <<MD
+cat > vault/projects/reports-app/features/csv-export/plans/csv-export/run.md <<MD
 ---
 title: "Build - CSV export of the reports page"
 tags:

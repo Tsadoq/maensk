@@ -1,6 +1,6 @@
 ---
 type: regex
 target: files
-pattern: '^vault/projects/reports-app/plan/[^/]+/record\.md$'
+pattern: '^vault/projects/reports-app/features/[^/]+/plans/[^/]+/record\.md$'
 flags: m
 ---

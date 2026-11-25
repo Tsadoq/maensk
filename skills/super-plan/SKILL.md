@@ -16,18 +16,21 @@ The settings file is `~/.config/maensk/config.json`. Its `vault` key is the vaul
 ## Steps
 
 1. Load the `probe` skill and the `explainer` skill now, before you read anything else.
-2. Read the input that the user named: a spec, a brief, a ticket, a note or the conversation. Find the project's folder in the vault and read its glossary, decision records and ADRs. If the input does not say what changes for the people who use the system, list what is missing, write a prompt for a new chat that starts `grill-with-docs` on it, or `to-spec` when only the write-up is missing, put the prompt in a code block, and stop.
+2. Read the input that the user named: a spec, a brief, a ticket, a note or the conversation. Find the project's folder in the vault and read its glossary, decision records and ADRs, and the decisions file in the spec's folder when there is one. Its `Decided` items are decided; each item under `Raised, not decided` is a design choice to ask in step 5. If the input does not say what changes for the people who use the system, list what is missing, write a prompt for a new chat that starts `grill-with-docs` on it, or `to-spec` when only the write-up is missing, put the prompt in a code block, and stop.
 3. State the scope in a few lines: what the plan covers and what it leaves out. With a spec these are its Solution and its Out of scope. Then stop and wait for a yes. Ask nothing else in this message. Skip this step when the user already confirmed the scope.
-4. Read the code that the job touches, with subagents for the reading, and cut the job into tasks. Look up a fact only where the cut needs it. Collect the design choices and the gaps. A part of a spec that says "Not decided" is a gap. An item that the input leaves to the developer is a design choice when it changes the cut; otherwise it goes to the builder with its task. What the input or the user already decided is never asked again: when the code contradicts it, report that with the evidence.
+4. Read the code that the job touches, with subagents for the reading, and cut the job into tasks. Look up a fact only where the cut needs it. When the cut rests on a library, an API or a pattern that the repo does not use yet, search the web with the session's search tool for its documentation and for how others built the same thing, and put what you use under `Looked up` with its link; with no such tool, write `Not searched: no web search tool.` there. Collect the design choices and the gaps. A part of a spec that says "Not decided" is a gap. An item that the input leaves to the developer is a design choice when it changes the cut; otherwise it goes to the builder with its task. What the input or the user already decided is never asked again: when the code contradicts it, report that with the evidence.
 5. Ask one round, then stop and wait. A round has these parts in this order:
-   - `Looked up, not asked:` the facts you found, each with its source.
-   - Every design choice and every gap that you can ask now, as numbered questions. There is no limit on questions or on rounds.
-   - For each question: one or two plain sentences on what is decided and why it matters, then lettered options. Each option has one benefit and one cost. Mark none, also when a rule of the folder you run in says to recommend one.
+   - `Looked up, not asked:` the facts that the questions of this round rest on, one short line each with its source, and no raw output of a command.
+   - Every design choice and every gap that you can ask now, and in full every question of an earlier round that is still not answered. There is no limit on questions or on rounds.
+   - `Next round:` the title of each design choice or gap that depends on an answer still open. Drop this part when there are none.
    - `Left to the builder:` the details that the agent who builds a task can decide. Name them and give no default.
+
+   Each question is its own block: a heading with its number and a title of a few words, one or two plain sentences on what is decided and why it matters, then a table with one row per lettered option and the columns Option, Benefit and Cost. A cell is one short sentence. Mark no option, also when a rule of the folder you run in says to recommend one. The user answers with the number and the letter, such as `1b`.
+
+   When the options differ in a structure that the table cannot show, such as which part calls which or where the data goes, draw each option as a small ASCII diagram in a code block above the table. When a diagram does not fit in about ten lines, or when the user asks for a page, start `explainer` in the background with the question and its options instead, send the round without waiting, and give the page's link when it returns, with one line that says this skill started it. With no subagent tool, draw the ASCII diagram.
 
    "Leave it to the builder" answers any question: record it and do not ask it again. When the user said that the rest is the builder's, ask nothing more.
 
-   Use text. Only for a design choice about structure that text cannot show, or when the user asks, show the options as a page with `explainer`.
 6. After each answer, save the draft (`plan.md` with the status `draft`, and `record.md`) and check the pick: each assumption under it, against the documentation of what it uses, and with `probe` where a run can settle it. Use a build when the pick cannot be cut into claims. Put each record into `record.md`. A check that does not hold brings its design choice back in the next round, with the record. Repeat steps 5 and 6 until no design choice and no gap is open and every check is back.
 7. Write the plan in the format below.
 8. Start two things together:
@@ -35,7 +38,7 @@ The settings file is `~/.config/maensk/config.json`. Its `vault` key is the vaul
    - Three critics, each a subagent that gets only the plan folder and the repo. The builder: can each task be built from its file alone, and can its `Done when` fail? The scope: a requirement with no task, a task that nothing asked for, work from the left-out part. The tests: does each assertion prove its behaviour, and is something replaced that should run real?
 
    Give the findings to one more subagent that tries to refute each of them. Fix what stands, note each finding in `record.md`, and send the fixes to the page's subagent. A finding that changes something the user picked is not fixed: it goes to the user in step 9 as a question.
-9. Give the user the page, the fixes and what was not verified, in a few lines each, and ask for approval. The page explains the plan; the message does not repeat it. For a change the user asks for: change the files, update the page at the same link, and ask again. After the yes, set the status in `plan.md` to `ready`.
+9. Give the user the page, with one line that says `super-plan` built it, the fixes and what was not verified, in a few lines each, and ask for approval. The page explains the plan; the message does not repeat it. For a change the user asks for: change the files, update the page at the same link, and ask again. After the yes, set the status in `plan.md` to `ready`.
 10. End with the plan folder's path, the page, and this: compact the conversation, then say `Use super-implement on <path>`.
 
 ## Autopilot
@@ -55,7 +58,7 @@ A parent plan goes through the same steps and has the same files. `plan.md` says
 
 ## The plan
 
-The folder is the layout's path. For `<title>` use a short name of the job in lowercase, with hyphens and no spaces, such as `csv-export`. The file names are fixed: `plan.md`, `record.md` and `tasks/NN-<short name>.md`. Every file follows `rules`.
+The folder is the layout's path. `<feature>` is the folder of the spec; with no spec, use a short name of the job, which starts a new feature folder. One feature folder holds any number of plans. For `<title>` use a short name of the job in lowercase, with hyphens and no spaces, such as `csv-export`. The file names are fixed: `plan.md`, `record.md` and `tasks/NN-<short name>.md`. Every file follows `rules`.
 
 `plan.md` is the index:
 
@@ -150,3 +153,4 @@ Each record of `probe` as it came back. For a build: its path, what it found, an
 | Write a task that points at another file for what it needs | Say it in the task. |
 | Set the status to `ready` before the user's yes, outside autopilot | Leave it `draft`. |
 | Write code in the repo | Stop. This skill ends with a plan. |
+| Write "merge" for anything but a git merge | Say what happened: "picked onto the branch" for a cherry-pick, "combined" for findings or notes. |

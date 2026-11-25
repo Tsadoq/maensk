@@ -3,7 +3,7 @@ type: llm
 focus: trace
 ---
 
-Judge only the files of the plan as they are at the end of the run, in the folder under `vault/projects/reports-app/plan/`.
+Judge only the files of the plan as they are at the end of the run, in the folder under `vault/projects/reports-app/features/`.
 
 The spec leaves the test approach undecided and leaves to the developer who can export.
 

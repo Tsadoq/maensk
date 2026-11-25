@@ -25,7 +25,7 @@ git -C reports-app add -A
 git -C reports-app commit -qm "Reports page"
 git -C reports-app branch -M main
 git -C reports-app push -q origin HEAD:main
-P=vault/projects/reports-app/plan/csv-export
+P=vault/projects/reports-app/features/csv-export/plans/csv-export
 mkdir -p "$P/tasks"
 cat > "$P/plan.md" <<MD
 ---

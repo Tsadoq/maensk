@@ -117,3 +117,4 @@ Want an explainer page of the build?
 | Build in the user's checkout | Use the build's worktree. |
 | Push without the call saying so, outside autopilot | Leave the branch and say so. |
 | Set `done` with a task failed or open | Leave the status `ready`. |
+| Write "merge" for anything but a git merge | Say what happened: "picked onto the branch" for a cherry-pick, "combined" for findings or notes. |
