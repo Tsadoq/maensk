@@ -167,7 +167,11 @@ cmp -s "$config" "$tmp/config.before" || fail "a second install changed the conf
 pinned "--review-tools"
 grep -qx "install npm:pi-web-search" "$tmp/pi.log" || fail "--pi --review-tools did not install pi-web-search"
 : >"$tmp/pi.log"
-"$origin/install.sh" --claude --review-tools --vault "$tmp/vault" --repos "$tmp/repos" >/dev/null
+git init -q "$tmp/decoy"
+cp "$tmp/decoy/.git/config" "$tmp/decoy.config"
+GIT_DIR="$tmp/decoy/.git" GIT_WORK_TREE="$tmp/decoy" "$origin/install.sh" --claude --review-tools --vault "$tmp/vault" --repos "$tmp/repos" >/dev/null
+cmp -s "$tmp/decoy/.git/config" "$tmp/decoy.config" || fail "an install with GIT_DIR set changed that repo's git config"
+pinned "GIT_DIR set"
 ! grep -q pi-web-search "$tmp/pi.log" || fail "--review-tools without --pi installed pi-web-search"
 
 sed "s|file://$tmp/upstream/security-review |file://$tmp/upstream/missing |" "$origin/install.sh" >"$tmp/missing.sh"

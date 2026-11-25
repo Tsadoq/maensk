@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 shopt -s nullglob
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX
 
 REPO_URL="${MAENSK_REPO_URL:-https://github.com/Tsadoq/maensk.git}"
 CLONE="${XDG_DATA_HOME:-$HOME/.local/share}/maensk"
