@@ -10,10 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
       - run: tools/check-words
       - run: shellcheck install.sh tests/*.sh .githooks/*
       - run: tests/check-words.sh
       - run: tests/install.sh
+      - run: tests/read-page.sh
+      - run: python3 tests/stub-context7.py
       - run: npm install --global @anthropic-ai/claude-code
       - run: claude plugin validate .
       - run: claude plugin validate .claude-plugin/marketplace.json

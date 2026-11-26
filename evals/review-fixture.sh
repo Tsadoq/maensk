@@ -26,6 +26,27 @@ for name in code-review security-review ponytail-review; do
   [ -f "$dest/$name/SKILL.md" ] || { echo "review-fixture.sh: no $name in $dest" >&2; exit 1; }
 done
 
+eval "$(sed -n '/^CONFIG=/p;/^SERVICES=(/,/^)/p;/^die() {/,/^}/p;/^check_key() {/,/^}/p;/^write_keys() {/,/^}/p;/^add_claude_servers() {/,/^}/p;/^edit_json() {/,/^}/p' "$here/../install.sh")"
+check_key CONTEXT7_API_KEY "${CONTEXT7_API_KEY:-}"
+check_key PARALLEL_API_KEY "${PARALLEL_API_KEY:-}"
+write_keys "$CONTEXT7_API_KEY" "$PARALLEL_API_KEY"
+add_claude_servers
+for name in context7 parallel; do
+  claude mcp get "$name" >/dev/null 2>&1 || { echo "review-fixture.sh: no MCP server $name" >&2; exit 1; }
+done
+edit_json deny "$HOME/.claude/settings.json" WebFetch
+edit_json deny "$HOME/.claude/settings.json" WebSearch
+
+page="$HOME/.config/maensk/read-page"
+mkdir -p "$page" "${MAENSK_READ_PAGE_CACHE:?}"
+cache="$(cd "$MAENSK_READ_PAGE_CACHE" && pwd)"
+cp "$here/../skills/super-review/read-page.mjs" "$here/../skills/super-review/package.json" "$page/"
+if [ ! -d "$cache/node_modules/patchright" ]; then
+  cp "$here/../skills/super-review/package.json" "$cache/"
+  (cd "$cache" && npm install --silent --no-audit --no-fund)
+fi
+ln -s "$cache/node_modules" "$page/node_modules"
+
 cd reports-app
 git checkout -q -b csv-export
 mkdir -p tests

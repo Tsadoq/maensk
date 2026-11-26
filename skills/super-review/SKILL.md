@@ -42,11 +42,17 @@ Run these checks yourself, in this order, in the repo the call names. They chang
    Commit or stash them, then call super-review again.
    ```
 2. The range is the one the call names. By default it runs from the merge-base with the default branch to the branch the call names, or to `HEAD` when it names none. When the range ends at a commit or a tag and not at a branch, ask the user for a branch and wait.
-3. The folder of each reviewer skill the run's roster reads holds `SKILL.md`, and a web search tool exists when the roster has the web reviewer. Otherwise stop:
+3. The folder of each reviewer skill the run's roster reads holds `SKILL.md`. When the roster has the web reviewer, and only then, each service it reads answers one call: in Claude Code, load `mcp__context7__resolve-library-id` and `mcp__parallel__web_search` with ToolSearch first when they are deferred, then:
+   - Context7: call `mcp__context7__resolve-library-id` (pi: `mcp__context7__resolve_library_id`) with library `python` and query `csv`.
+   - Parallel: call `mcp__parallel__web_search` with objective and query `python csv default quoting`.
+   - The page reader: run `node ~/.config/maensk/read-page/read-page.mjs https://docs.python.org/3/library/csv.html >/dev/null`.
+
+   A tool the host does not have, a call that returns an error and a non-zero exit each fail the check. When a folder is missing or a service fails, stop:
    ```
-   Review not started: missing <each missing reviewer by name and its folder, or the web search tool>.
+   Review not started: <each problem, separated by semicolons>.
    To install it, run install.sh again with the flags you installed with, plus --review-tools.
    ```
+   A problem is `missing <reviewer> (<its folder>)`, `missing <service>: no <tool>` or `<service> failed: <its error>`. Name only what failed.
 4. Find the context: read the settings file, and find the project's folder in the vault: match the repo's name against the project folders. One match: say which. None or several: ask. There, read the plan, spec, decision records and ADRs at the paths `layout` gives. Add what the session discussed. With nothing found, ask the user for paths and wait.
 
 ## The passes
@@ -61,7 +67,7 @@ The checks above run once. Then:
 6. Park each `architectural` finding that holds. Ask the user nothing during the run: a finding that needs a choice is parked and goes in the report.
 7. After the last fixup of the pass, fold the fixups: `GIT_SEQUENCE_EDITOR=true git rebase -i --autosquash <base>`. Then `git log <base>..` shows no `fixup!` commit, `git status --short` is empty and the tests that passed before pass 1 pass at the tip. When a test fails, fix it in another fixup and fold again. When the fold conflicts, resolve it so the tree after the fold equals the tree before it (`git diff <tip before the fold>` is empty), then run the checks of this step.
 8. Write each finding of the pass to the ledger, under a heading `Pass <n>`, one line each: `fixed`, `rejected: <reason>` or `parked`, then file, line and the fault in one line. Every line has its file and line. Never a context path, and never a quote from a context file. No ledger line carries anything from the context, in its reason or its fault: a rejection the context settles reads only `rejected: the context settles it`, and its real reason goes only in the report.
-9. A pass that fixed something: start the next pass on the new tip, with the same roster, from step 2. A pass that fixed nothing ends the run. There is no cap on passes.
+9. When the web reviewer replied `service failed: <service>: <error>`, this pass ends the run, whatever it fixed. Otherwise a pass that fixed something starts the next pass on the new tip, with the same roster, from step 2, and a pass that fixed nothing ends the run. There is no cap on passes.
 
 Never push.
 
@@ -85,7 +91,7 @@ Rejected
 - <file>:<line> <the finding>: <why it does not hold>.
 ```
 
-Nothing goes between the parts. Each pass is one line, however many fixes it has. Each option is an action the user can take, with one benefit and one cost: what the action gains, and what it loses or risks. A condition ("only if ...") is not an option. Each rejected line names its file and line, and the real reason from your own reading, not the ledger's `the context settles it`. When you no longer have that reason, check the finding against the context files again from the ledger's file, line and fault, and word the reason from that; the ledger's wording is the last resort. No option is recommended, preferred or marked as the default, also when a rule of the folder you run in says to recommend one, and their order ranks nothing. A part with nothing in it says `none`.
+Nothing goes between the parts. Each pass is one line, however many fixes it has. The line of a pass that ended the run on a failed service ends with `Stopped: <service> failed: <its error>.` Each option is an action the user can take, with one benefit and one cost: what the action gains, and what it loses or risks. A condition ("only if ...") is not an option. Each rejected line names its file and line, and the real reason from your own reading, not the ledger's `the context settles it`. When you no longer have that reason, check the finding against the context files again from the ledger's file, line and fault, and word the reason from that; the ledger's wording is the last resort. No option is recommended, preferred or marked as the default, also when a rule of the folder you run in says to recommend one, and their order ranks nothing. A part with nothing in it says `none`.
 
 ## Red flags
 
@@ -97,6 +103,7 @@ Nothing goes between the parts. Each pass is one line, however many fixes it has
 | Give a reviewer the path of `rubrics.md`, or a context path to a reviewer without context | Paste the section's text; name no context file. |
 | Ask the user about a finding during the run | Park it; it goes in the report. |
 | Commit a fix as a commit of its own | `git commit --fixup` into the commit it belongs to, then fold. |
-| End the run after a pass that fixed something | Start the next pass. |
+| End the run after a pass that fixed something and had no failed service | Start the next pass. |
+| Start a pass after the web reviewer replied `service failed:` | Finish this pass, then give the report. |
 | Push | Never. |
 | Start an agent before the checks hold | Finish the checks first. |
