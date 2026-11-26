@@ -20,8 +20,9 @@ cat > "$HOME/.config/maensk/config.json" <<JSON
     "adr": { "path": "projects/<project>/plan/adr/<name> ADR-<number> - <title>.md", "template": null },
     "decision-record": { "path": "projects/<project>/plan/decisions/<name> Decision Record - <title>.md", "template": null },
     "design-note": { "path": "projects/<project>/design/<name> <title>.md", "template": null },
-    "spec": { "path": "projects/<project>/plan/<name> <title> Spec.md", "template": null },
-    "plan": { "path": "projects/<project>/plan/<title>/", "template": null },
+    "decisions": { "path": "projects/<project>/features/<feature>/<name> <title> Decisions.md", "template": null },
+    "spec": { "path": "projects/<project>/features/<feature>/<name> <title> Spec.md", "template": null },
+    "plan": { "path": "projects/<project>/features/<feature>/plans/<title>/", "template": null },
     "research": { "path": "projects/<project>/research/<name> Findings - <title>.md", "template": null },
     "lessons": { "path": "projects/<project>/research/<name> Lessons.md", "template": null }
   }

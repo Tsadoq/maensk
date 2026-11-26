@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 "$(dirname "$0")/../impl-fixture.sh"
-P=vault/projects/reports-app/plan/reports-overhaul
+P=vault/projects/reports-app/features/reports-overhaul/plans/reports-overhaul
 mkdir -p "$P/tasks" "$P/01-query-builder/tasks"
 cat > "$P/plan.md" <<MD
 ---

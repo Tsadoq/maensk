@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 "$(cd "$(dirname "$0")" && pwd)/fixture.sh"
-mkdir -p vault/projects/reports-app/plan/decisions
+mkdir -p vault/projects/reports-app/plan/decisions vault/projects/reports-app/features/csv-export
 cat > "vault/projects/reports-app/plan/decisions/Reports Decision Record - Exports read from the primary database.md" <<'MD'
 ---
 title: "Reports Decision Record - Exports read from the primary database"
@@ -11,7 +11,7 @@ tags:
 
 ADR-001 sends every read of report rows to the replica database. An export reads the primary database instead, as the one exception. Finance compares an export with the bank in the same minute, and rows that are five minutes old make the totals wrong.
 MD
-cat > "vault/projects/reports-app/plan/Reports CSV Export Spec.md" <<'MD'
+cat > "vault/projects/reports-app/features/csv-export/Reports CSV Export Spec.md" <<'MD'
 ---
 title: "Reports CSV Export Spec"
 tags:
