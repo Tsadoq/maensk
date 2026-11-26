@@ -13,7 +13,10 @@ LABEL="io.github.tsadoq.maensk-update"
 PI_VIEWER="npm:@nicknisi/pi-artifacts"
 PI_SUBAGENTS="npm:@tintinweb/pi-subagents"
 LANGUAGES="python rust go javascript"
-PI_WEB_SEARCH="npm:pi-web-search"
+SERVICES=(
+  "context7 https://mcp.context7.com/mcp CONTEXT7_API_KEY"
+  "parallel https://mcp.parallel.ai/mcp PARALLEL_API_KEY"
+)
 REVIEWERS=(
   "https://github.com/anthropics/knowledge-work-plugins.git 5e504ae11498f2b8daa30d86b7dab97b2ecd8092 engineering/skills/code-review code-review"
   "https://github.com/getsentry/skills.git a582c51ee29d0f35e6ac321340796f77d43da733 skills/security-review security-review"
@@ -40,8 +43,11 @@ Answers as flags, for a run with no questions:
                  super-implement runs on each task: python (mutmut), rust
                  (cargo-mutants), go (gremlins), javascript (Stryker)
   --review-tools copy the reviewer skills that super-review runs, each at a
-                 pinned commit, into ~/.config/maensk/reviewers/; with --pi,
-                 also install the pi package pi-web-search
+                 pinned commit, into ~/.config/maensk/reviewers/, and add the
+                 Context7 and Parallel MCP servers its web reviewer checks
+                 claims with; their keys come from CONTEXT7_API_KEY and
+                 PARALLEL_API_KEY, or are asked for when unset, and are kept
+                 in ~/.config/maensk/keys
   --vault DIR    the Obsidian vault the skills keep their documents in (required)
   --repos DIR    the folder that holds your code repos; a session opened in the
                  vault may then write there. Without it, each repo is added when
@@ -57,7 +63,8 @@ die() {
 ask() {
   { : </dev/tty; } 2>/dev/null || die "no terminal to ask on; see --help for the flags"
   printf '%s ' "$1" >/dev/tty
-  IFS= read -r REPLY </dev/tty || REPLY=""
+  IFS= read -r ${2:+-s} REPLY </dev/tty || REPLY=""
+  [ -z "${2:-}" ] || echo >/dev/tty
 }
 
 yes_no() {
@@ -140,27 +147,83 @@ install_reviewers() {
   done
 }
 
-allow() {
-  python3 - "$1" "$2" <<'PY'
+check_key() {
+  case "$2" in
+    "" | *[[:space:][:cntrl:]\"\\]*) die "$1 is empty or holds a quote, a backslash, whitespace or a control character" ;;
+  esac
+}
+
+write_keys() {
+  local dir
+  dir="$(dirname "$CONFIG")"
+  mkdir -p "$dir"
+  (umask 077 && touch "$dir/keys" && chmod 600 "$dir/keys" &&
+    printf 'CONTEXT7_API_KEY=%s\nPARALLEL_API_KEY=%s\n' "$1" "$2" >"$dir/keys")
+  cat >"$dir/key-header" <<'EOF'
+#!/bin/sh
+key="$(sed -n "s/^$1=//p" "$(dirname "$0")/keys")"
+if [ "${2:-}" = json ]; then
+  printf '{"Authorization": "Bearer %s"}\n' "$key"
+else
+  printf 'Bearer %s\n' "$key"
+fi
+EOF
+  chmod 755 "$dir/key-header"
+  echo "wrote the keys to $dir/keys"
+}
+
+add_claude_servers() {
+  local entry name url var server
+  for entry in "${SERVICES[@]}"; do
+    read -r name url var <<<"$entry"
+    server="$(python3 -c 'import json, shlex, sys; print(json.dumps({"type": "http", "url": sys.argv[1], "headersHelper": shlex.join(sys.argv[2:])}))' \
+      "$url" "$(dirname "$CONFIG")/key-header" "$var" json)"
+    claude mcp remove --scope user "$name" >/dev/null 2>&1 || true
+    if command -v claude >/dev/null && claude mcp add-json --scope user "$name" "$server" >/dev/null; then
+      echo "added the MCP server $name to Claude Code"
+    else
+      echo "could not add the MCP server $name to Claude Code: run install.sh again with --claude --review-tools later; super-review needs it to check claims on the web"
+    fi
+  done
+}
+
+add_pi_servers() {
+  if ! edit_json servers "$HOME/.pi/agent/mcp.json" "$(dirname "$CONFIG")/key-header" "${SERVICES[@]}"; then
+    echo "could not add the MCP servers for pi: run install.sh again with --pi --review-tools later; super-review needs them to check claims on the web"
+  fi
+}
+
+edit_json() {
+  python3 - "$@" <<'PY'
 import json
 import os
 import pathlib
+import shlex
 import shutil
 import sys
 
-path, rule = pathlib.Path(sys.argv[1]).resolve(), sys.argv[2]
+action, path, args = sys.argv[1], pathlib.Path(sys.argv[2]).resolve(), sys.argv[3:]
 try:
     data = json.loads(path.read_text()) if path.exists() else {}
-    rules = data.setdefault("permissions", {}).setdefault("allow", [])
-    if rule not in rules:
-        rules.append(rule)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temp = path.with_name(path.name + ".maensk-tmp")
-        temp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-        if path.exists():
-            shutil.copymode(path, temp)
-        os.replace(temp, path)
-        print(f"allowed {rule} in {path}")
+    if action in ("allow", "deny"):
+        rules = data.setdefault("permissions", {}).setdefault(action, [])
+        if args[0] in rules:
+            sys.exit()
+        rules.append(args[0])
+        done = f"added {args[0]} to the {action} rules in {path}"
+    else:
+        servers = data.setdefault("mcpServers", {})
+        for entry in args[1:]:
+            name, url, var = entry.split()
+            servers[name] = {"url": url, "exposure": "direct", "headers": {"Authorization": "!" + shlex.join([args[0], var])}}
+        done = f"added the MCP servers context7 and parallel to {path}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".maensk-tmp")
+    temp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    if path.exists():
+        shutil.copymode(path, temp)
+    os.replace(temp, path)
+    print(done)
 except (ValueError, AttributeError, TypeError):
     sys.exit(f"install.sh: {path} is not the JSON this script expects; it was left as it is")
 PY
@@ -289,6 +352,7 @@ EOF
 
 main() {
   local here="" update=0 claude=0 pi=0 viewer=0 review=0 vault="" repos="" languages="" questions=0 dest src lang
+  local context7="${CONTEXT7_API_KEY:-}" parallel="${PARALLEL_API_KEY:-}"
   local tools=()
   if [ -f "${BASH_SOURCE[0]:-}" ]; then
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -351,8 +415,20 @@ main() {
     echo "super-implement runs a mutation tool on each task, to see that its tests fail on broken code." >/dev/tty
     ask "Languages to install one for ($LANGUAGES; empty: none):"
     languages="$REPLY"
-    echo "super-review runs three reviewer skills from GitHub, each at a pinned commit." >/dev/tty
-    if yes_no "Install them?" n; then review=1; fi
+    echo "super-review runs three reviewer skills from GitHub, each at a pinned commit, and checks claims on the web through the Context7 and Parallel MCP servers, which need an API key each (CONTEXT7_API_KEY, PARALLEL_API_KEY)." >/dev/tty
+    if yes_no "Install the skills and add the servers?" n; then review=1; fi
+  fi
+  if [ "$review" = 1 ]; then
+    if [ -z "$context7" ]; then
+      ask "Context7 API key:" hidden
+      context7="$REPLY"
+    fi
+    if [ -z "$parallel" ]; then
+      ask "Parallel API key:" hidden
+      parallel="$REPLY"
+    fi
+    check_key CONTEXT7_API_KEY "$context7"
+    check_key PARALLEL_API_KEY "$parallel"
   fi
   languages="${languages//,/ }"
   for lang in $languages; do
@@ -367,9 +443,11 @@ main() {
   [ -z "$here" ] || [ ! -d "$here/skills" ] || src="$here"
   if [ "$claude" = 1 ]; then
     install_skills "$src" "$CLAUDE_SKILLS"
-    allow "$HOME/.claude/settings.json" "Edit(/$vault/**)"
-    allow "$HOME/.claude/settings.json" "Edit(/$(dirname "$CONFIG")/**)"
-    [ -z "$repos" ] || allow "$vault/.claude/settings.local.json" "Edit(/$repos/**)"
+    edit_json allow "$HOME/.claude/settings.json" "Edit(/$vault/**)"
+    edit_json allow "$HOME/.claude/settings.json" "Edit(/$(dirname "$CONFIG")/**)"
+    edit_json deny "$HOME/.claude/settings.json" "Edit(/$(dirname "$CONFIG")/keys)"
+    edit_json deny "$HOME/.claude/settings.json" "Edit(/$(dirname "$CONFIG")/key-header)"
+    [ -z "$repos" ] || edit_json allow "$vault/.claude/settings.local.json" "Edit(/$repos/**)"
   fi
   if [ "$pi" = 1 ]; then
     install_skills "$src" "$PI_SKILLS"
@@ -389,13 +467,9 @@ main() {
   fi
   if [ "$review" = 1 ]; then
     install_reviewers 0
-  fi
-  if [ "$pi$review" = 11 ]; then
-    if command -v pi >/dev/null && pi install "$PI_WEB_SEARCH"; then
-      echo "installed the pi package $PI_WEB_SEARCH"
-    else
-      echo "could not install $PI_WEB_SEARCH: run 'pi install $PI_WEB_SEARCH' later; super-review in pi needs it to check claims on the web"
-    fi
+    write_keys "$context7" "$parallel"
+    [ "$claude" = 0 ] || add_claude_servers
+    [ "$pi" = 0 ] || add_pi_servers
   fi
   for lang in $languages; do
     if install_mutation "$lang" >/dev/null 2>&1; then
