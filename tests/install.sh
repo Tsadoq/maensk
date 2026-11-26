@@ -391,6 +391,8 @@ for version in v22.0.0 v20.11.0 v18.20.4 v8.17.0 missing; do
   [ ! -e "$tmp/npx.log" ] || fail "Node $version: npx ran on a Node that is too old"
 done
 rm "$tmp/node.version"
+unset CONTEXT7_API_KEY PARALLEL_API_KEY
+rm -f "$keys"
 echo changed >"$reviewers/code-review/SKILL.md"
 echo stray >"$reviewers/code-review/stray"
 rm -rf "$reviewers/security-review"
@@ -416,6 +418,35 @@ cmp -s "$config" "$tmp/config.before" || fail "update changed the config"
 rm -rf "$reviewers"
 "${detach[@]}" "$clone/install.sh" --update </dev/null >/dev/null
 [ ! -e "$reviewers" ] || fail "update created the reviewers folder"
+[ ! -e "$keys" ] || fail "update without keys wrote the key file"
+
+(umask 077 && printf 'CONTEXT7_API_KEY=ctx7-file\nPARALLEL_API_KEY=parallel-file\n' >"$keys")
+rm -rf "$read_page" "$mcp"
+rm -f "$tmp/npm.log" "$tmp/npx.log"
+: >"$tmp/claude.log"
+"${detach[@]}" "$clone/install.sh" --update </dev/null >/dev/null
+pinned "update with keys in the key file"
+ran_in_read_page "update with keys in the key file" npm install
+ran_in_read_page "update with keys in the key file" npx "patchright install chromium"
+for name in context7 parallel; do
+  grep -qF "\"add-json\", \"--scope\", \"user\", \"$name\"" "$tmp/claude.log" || fail "update with keys did not add $name to Claude Code"
+  python3 -c 'import json, sys; assert sys.argv[2] in json.load(open(sys.argv[1]))["mcpServers"]' "$mcp" "$name" ||
+    fail "update with keys did not add $name to pi"
+done
+grep -qx "CONTEXT7_API_KEY=ctx7-file" "$keys" || fail "update changed the Context7 key in the key file"
+[ -n "$(find "$keys" -perm 600)" ] || fail "update left the key file at a mode other than 600"
+only_in_keys "update with keys in the key file" ctx7-file parallel-file
+
+rm -f "$keys"
+CONTEXT7_API_KEY=ctx7-env PARALLEL_API_KEY=parallel-env "${detach[@]}" "$clone/install.sh" --update </dev/null >/dev/null
+grep -qx "CONTEXT7_API_KEY=ctx7-env" "$keys" || fail "update did not write the Context7 key from the environment"
+grep -qx "PARALLEL_API_KEY=parallel-env" "$keys" || fail "update did not write the Parallel key from the environment"
+
+cp "$keys" "$tmp/keys.before"
+if CONTEXT7_API_KEY='ctx7"bad' "${detach[@]}" "$clone/install.sh" --update </dev/null >/dev/null 2>&1; then
+  fail "update accepted a Context7 key with a quote"
+fi
+cmp -s "$keys" "$tmp/keys.before" || fail "update with a bad key changed the key file"
 
 printf '{' >"$settings"
 if "$origin/install.sh" --claude --vault "$tmp/vault" >/dev/null 2>&1; then fail "installed over broken settings"; fi

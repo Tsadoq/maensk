@@ -29,7 +29,10 @@ Installs the maensk skills and keeps them updated.
 
   ./install.sh             ask what to set up
   ./install.sh --update    pull this clone and reinstall from it, ask nothing
-                           (the daily timer runs this in the installer's own clone)
+                           (the daily timer runs this in the installer's own clone);
+                           with both keys in the environment or in
+                           ~/.config/maensk/keys, also install or refresh the
+                           review tools
   curl -fsSL https://raw.githubusercontent.com/Tsadoq/maensk/main/install.sh | bash
 
 Answers as flags, for a run with no questions:
@@ -414,7 +417,20 @@ main() {
     for dest in "$CLAUDE_SKILLS" "$PI_SKILLS"; do
       if compgen -G "$dest/*/$MARKER" >/dev/null; then install_skills "$CLONE" "$dest"; fi
     done
-    install_reviewers 1
+    dest="$(dirname "$CONFIG")/keys"
+    [ -n "$context7" ] || context7="$(sed -n 's/^CONTEXT7_API_KEY=//p' "$dest" 2>/dev/null || true)"
+    [ -n "$parallel" ] || parallel="$(sed -n 's/^PARALLEL_API_KEY=//p' "$dest" 2>/dev/null || true)"
+    if [ -z "$context7" ] || [ -z "$parallel" ]; then
+      install_reviewers 1
+      exit 0
+    fi
+    check_key CONTEXT7_API_KEY "$context7"
+    check_key PARALLEL_API_KEY "$parallel"
+    install_reviewers 0
+    install_read_page "$CLONE"
+    write_keys "$context7" "$parallel"
+    if compgen -G "$CLAUDE_SKILLS/*/$MARKER" >/dev/null; then add_claude_servers; fi
+    if compgen -G "$PI_SKILLS/*/$MARKER" >/dev/null; then add_pi_servers; fi
     exit 0
   fi
 
