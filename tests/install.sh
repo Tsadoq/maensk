@@ -20,6 +20,7 @@ settings="$HOME/.claude/settings.json"
 config="$XDG_CONFIG_HOME/maensk/config.json"
 reviewers="$XDG_CONFIG_HOME/maensk/reviewers"
 keys="$XDG_CONFIG_HOME/maensk/keys"
+read_page="$XDG_CONFIG_HOME/maensk/read-page"
 mcp="$HOME/.pi/agent/mcp.json"
 detach=()
 if command -v setsid >/dev/null; then detach=(setsid -w); fi
@@ -66,12 +67,33 @@ rerun_line() {
   grep -F -- --review-tools <<<"$out" | grep -qF -- "$2" || fail "$1: no line says to run install.sh again for $2"
 }
 
+ran_in_read_page() {
+  if ! awk -v dir="$read_page" -v want=" $3 " '$1 == dir && index($0 " ", want) { found = 1 } END { exit !found }' "$tmp/$2.log" 2>/dev/null; then
+    fail "$1: $2 did not run $3 in $read_page"
+  fi
+}
+
 mkdir -p "$HOME/.claude" "$tmp/vault" "$tmp/repos" "$tmp/bin" "$tmp/claude-bin" "$origin"
 for stub in systemctl launchctl pi pipx cargo; do
   printf '#!/bin/sh\necho "$@" >>"%s/%s.log"\n' "$tmp" "$stub" >"$tmp/bin/$stub"
   chmod +x "$tmp/bin/$stub"
 done
 printf '#!/bin/sh\n[ -t 0 ] || cat >/dev/null\necho "$@" >>"%s/pi.log"\n' "$tmp" >"$tmp/bin/pi"
+for stub in npm npx; do
+  cat >"$tmp/bin/$stub" <<EOF
+#!/bin/sh
+echo "\$(pwd -P) \$*" >>"$tmp/$stub.log"
+echo "$stub \$*" >>"$tmp/steps.log"
+[ ! -e "$tmp/$stub.fail" ]
+EOF
+  chmod +x "$tmp/bin/$stub"
+done
+cat >"$tmp/bin/node" <<EOF
+#!/bin/sh
+[ "\$(cat "$tmp/node.version" 2>/dev/null)" != missing ] || exit 127
+cat "$tmp/node.version" 2>/dev/null || echo v22.1.0
+EOF
+chmod +x "$tmp/bin/node"
 cat >"$tmp/claude-bin/claude" <<EOF
 #!/bin/sh
 python3 -c "import json, sys; print(json.dumps(sys.argv[1:]))" "\$@" >>"$tmp/claude.log"
@@ -112,6 +134,7 @@ bash -s -- --pi --vault "$tmp/vault" <"$origin/install.sh" >/dev/null
 [ ! -e "$reviewers" ] || fail "an install without --review-tools fetched the reviewers"
 [ ! -e "$keys" ] || fail "an install without --review-tools wrote the key file"
 [ ! -e "$mcp" ] || fail "an install without --review-tools added pi servers"
+[ ! -e "$tmp/npm.log" ] || fail "an install without --review-tools ran npm"
 
 if script --version >/dev/null 2>&1; then
   printf 'y\ny\nn\n%s\n\n\ny\nctx7-typed\nparallel-typed\n' "$tmp/vault" | script -qec "$origin/install.sh" /dev/null >/dev/null
@@ -142,6 +165,7 @@ if script --version >/dev/null 2>&1; then
   ! grep -q pi-artifacts "$tmp/pi.log" || fail "installed the pi viewer after a no"
   ! grep -q mutation "$config" || fail "an empty languages answer wrote a mutation tool"
 fi
+rm -f "$tmp/npm.log" "$tmp/npx.log"
 
 mkdir -p "$XDG_CONFIG_HOME/git"
 printf '*.swp' >"$XDG_CONFIG_HOME/git/ignore"
@@ -221,6 +245,7 @@ cmp -s "$config" "$tmp/config.before" || fail "a second install changed the conf
 [ ! -e "$keys" ] || fail "an install without --review-tools wrote the key file"
 [ ! -e "$mcp" ] || fail "an install without --review-tools added pi servers"
 [ ! -s "$tmp/claude.log" ] || fail "an install without --review-tools added Claude Code servers"
+[ ! -e "$tmp/npm.log" ] || fail "an install without --review-tools ran npm"
 
 : >"$tmp/pi.log"
 : >"$tmp/claude.log"
@@ -230,8 +255,15 @@ chmod 644 "$keys"
 echo '{"mcpServers": {"mine": {"command": "mine"}}}' >"$mcp"
 chmod 640 "$mcp"
 export CONTEXT7_API_KEY=ctx7-fake PARALLEL_API_KEY=parallel-fake
+rm -rf "$read_page" "$tmp/steps.log"
 "$origin/install.sh" --claude --pi --review-tools --vault "$tmp/vault" --repos "$tmp/repos" >/dev/null
 pinned "--review-tools"
+for file in read-page.mjs package.json; do
+  cmp -s "$root/skills/super-review/$file" "$read_page/$file" || fail "--review-tools did not copy $file to $read_page"
+done
+ran_in_read_page "--review-tools" npm install
+ran_in_read_page "--review-tools" npx "patchright install chromium"
+[ "$(cut -d' ' -f1 "$tmp/steps.log" | tr '\n' ' ')" = "npm npx " ] || fail "--review-tools did not run npm install once, then npx once"
 ! grep -q pi-web-search "$tmp/pi.log" || fail "--pi --review-tools installed pi-web-search"
 only_in_keys "keys from the environment" ctx7-fake parallel-fake
 python3 - "$tmp" <<'PY'
@@ -289,9 +321,13 @@ git init -q "$tmp/decoy"
 cp "$tmp/decoy/.git/config" "$tmp/decoy.config"
 echo '{"mcpServers": {}}' >"$mcp"
 cp "$mcp" "$tmp/mcp.before"
+echo v24.0.0 >"$tmp/node.version"
+rm -f "$tmp/npm.log"
 GIT_DIR="$tmp/decoy/.git" GIT_WORK_TREE="$tmp/decoy" "$origin/install.sh" --claude --review-tools --vault "$tmp/vault" --repos "$tmp/repos" >/dev/null
 cmp -s "$tmp/decoy/.git/config" "$tmp/decoy.config" || fail "an install with GIT_DIR set changed that repo's git config"
 pinned "GIT_DIR set"
+rm "$tmp/node.version"
+ran_in_read_page "Node v24.0.0" npm install
 cmp -s "$mcp" "$tmp/mcp.before" || fail "--review-tools without --pi changed the pi servers"
 cp "$keys" "$tmp/keys.before"
 for bad in 'ctx7"bad' 'ctx7\bad' 'ctx7 bad' $'ctx7\tbad' $'ctx7\x01bad'; do
@@ -337,6 +373,24 @@ finishes "a malformed mcp.json" "$origin/install.sh" --pi --review-tools --vault
 rerun_line "a malformed mcp.json" "--pi"
 [ "$(cat "$mcp")" = "{" ] || fail "a malformed mcp.json was overwritten"
 [ ! -s "$tmp/claude.log" ] || fail "an install without --claude added Claude Code servers"
+touch "$tmp/npm.fail"
+finishes "a failed npm install" "$origin/install.sh" --claude --review-tools --vault "$tmp/vault"
+rm "$tmp/npm.fail"
+rerun_line "a failed npm install" Patchright
+touch "$tmp/npx.fail"
+finishes "a failed npx patchright install" "$origin/install.sh" --claude --review-tools --vault "$tmp/vault"
+rm "$tmp/npx.fail"
+rerun_line "a failed npx patchright install" Patchright
+for version in v22.0.0 v20.11.0 v18.20.4 v8.17.0 missing; do
+  echo "$version" >"$tmp/node.version"
+  rm -f "$tmp/npm.log" "$tmp/npx.log"
+  finishes "Node $version" "$origin/install.sh" --claude --review-tools --vault "$tmp/vault"
+  rerun_line "Node $version" Patchright
+  grep -qF 22.1 <<<"$out" || fail "Node $version: no line names Node 22.1"
+  [ ! -e "$tmp/npm.log" ] || fail "Node $version: npm ran on a Node that is too old"
+  [ ! -e "$tmp/npx.log" ] || fail "Node $version: npx ran on a Node that is too old"
+done
+rm "$tmp/node.version"
 echo changed >"$reviewers/code-review/SKILL.md"
 echo stray >"$reviewers/code-review/stray"
 rm -rf "$reviewers/security-review"

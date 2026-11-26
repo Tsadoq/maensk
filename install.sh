@@ -47,7 +47,10 @@ Answers as flags, for a run with no questions:
                  Context7 and Parallel MCP servers its web reviewer checks
                  claims with; their keys come from CONTEXT7_API_KEY and
                  PARALLEL_API_KEY, or are asked for when unset, and are kept
-                 in ~/.config/maensk/keys
+                 in ~/.config/maensk/keys. It also installs Patchright and the
+                 page script the web reviewer reads pages with, in
+                 ~/.config/maensk/read-page/; that needs Node 22.1 or later
+                 and about 700 MB of disk for Patchright's Chromium
   --vault DIR    the Obsidian vault the skills keep their documents in (required)
   --repos DIR    the folder that holds your code repos; a session opened in the
                  vault may then write there. Without it, each repo is added when
@@ -145,6 +148,24 @@ install_reviewers() {
     rm -rf "$temp"
     echo "installed the reviewer skill $name in $dest/$name"
   done
+}
+
+install_read_page() {
+  local src="$1" dest version major minor
+  local rerun="run install.sh again with --review-tools later; super-review needs Patchright to read web pages"
+  dest="$(dirname "$CONFIG")/read-page"
+  version="$(node --version 2>/dev/null || true)"
+  IFS=. read -r major minor _ <<<"${version#v}"
+  if ! [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] || ((major < 22 || (major == 22 && minor < 1))); then
+    echo "Patchright needs Node 22.1 or later, found ${version:-no node}: install it, then $rerun"
+    return
+  fi
+  if (mkdir -p "$dest" && cp "$src/skills/super-review/read-page.mjs" "$src/skills/super-review/package.json" "$dest/" &&
+    cd "$dest" && npm install --no-audit --no-fund >/dev/null && npx patchright install chromium >/dev/null); then
+    echo "installed Patchright and the page script in $dest"
+  else
+    echo "could not install Patchright in $dest: $rerun"
+  fi
 }
 
 check_key() {
@@ -467,6 +488,7 @@ main() {
   fi
   if [ "$review" = 1 ]; then
     install_reviewers 0
+    install_read_page "$src"
     write_keys "$context7" "$parallel"
     [ "$claude" = 0 ] || add_claude_servers
     [ "$pi" = 0 ] || add_pi_servers
