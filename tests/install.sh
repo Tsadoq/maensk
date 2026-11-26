@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(cd "$(mktemp -d)" && pwd -P)"
@@ -13,6 +14,7 @@ origin="$tmp/origin"
 clone="$XDG_DATA_HOME/maensk"
 settings="$HOME/.claude/settings.json"
 config="$XDG_CONFIG_HOME/maensk/config.json"
+reviewers="$XDG_CONFIG_HOME/maensk/reviewers"
 detach=()
 if command -v setsid >/dev/null; then detach=(setsid -w); fi
 
@@ -22,8 +24,20 @@ fail() {
 }
 
 commit() {
-  git -C "$origin" add -A
-  git -C "$origin" -c user.name=test -c user.email=test@example.invalid commit -q -m "$1"
+  git -C "${2:-$origin}" add -A
+  git -C "${2:-$origin}" -c user.name=test -c user.email=test@example.invalid commit -q -m "$1"
+}
+
+pinned() {
+  local name
+  for name in code-review security-review ponytail-review; do
+    [ "$(cd "$reviewers/$name" 2>/dev/null && find . -type f | LC_ALL=C sort | tr '\n' ' ')" = "./LICENSE ./SKILL.md ./references/guide.md " ] ||
+      fail "$1: $name is not the pinned folder with one licence"
+    [ "$(cat "$reviewers/$name/SKILL.md")" = "pinned $name" ] || fail "$1: $name is not at the pin"
+    [ "$(cat "$reviewers/$name/references/guide.md")" = "nested $name" ] || fail "$1: $name lost its nested file"
+  done
+  [ "$(cat "$reviewers/code-review/LICENSE")" = "repo licence" ] || fail "$1: the repo licence was not copied"
+  [ "$(cat "$reviewers/ponytail-review/LICENSE")" = "own licence" ] || fail "$1: a folder's own licence was replaced"
 }
 
 mkdir -p "$HOME/.claude" "$tmp/vault" "$tmp/repos" "$tmp/bin" "$origin"
@@ -34,6 +48,27 @@ done
 printf '#!/bin/sh\n[ -t 0 ] || cat >/dev/null\necho "$@" >>"%s/pi.log"\n' "$tmp" >"$tmp/bin/pi"
 git init -q -b main "$origin"
 cp -R "$root/install.sh" "$root/skills" "$origin/"
+pins=""
+for spec in "code-review engineering/skills/code-review" "security-review skills/security-review" "ponytail-review skills/ponytail-review"; do
+  read -r name sub <<<"$spec"
+  repo="$tmp/upstream/$name"
+  git init -q -b main "$repo"
+  git -C "$repo" config uploadpack.allowFilter true
+  git -C "$repo" config uploadpack.allowAnySHA1InWant true
+  mkdir -p "$repo/$sub/references"
+  echo "repo licence" >"$repo/LICENSE"
+  echo "pinned $name" >"$repo/$sub/SKILL.md"
+  echo "nested $name" >"$repo/$sub/references/guide.md"
+  [ "$name" != ponytail-review ] || echo "own licence" >"$repo/$sub/LICENSE"
+  commit pin "$repo"
+  pins+="  \"file://$repo $(git -C "$repo" rev-parse HEAD) $sub $name\""$'\n'
+  echo "tip $name" >"$repo/$sub/SKILL.md"
+  echo "tip $name" >"$repo/$sub/references/guide.md"
+  commit tip "$repo"
+done
+awk -v pins="$pins" '/^REVIEWERS=\(/ { print; printf "%s", pins; skip = 1; next } skip && /^\)/ { skip = 0 } !skip' \
+  "$root/install.sh" >"$origin/install.sh"
+grep -q "file://$tmp/upstream" "$origin/install.sh" || fail "install.sh has no REVIEWERS array to point at the test repos"
 commit first
 echo '{"model": "kept", "permissions": {"allow": ["Bash(ls *)"]}}' >"$settings"
 chmod 600 "$settings"
@@ -42,9 +77,14 @@ bash -s -- --pi --vault "$tmp/vault" <"$origin/install.sh" >/dev/null
 [ -f "$HOME/.agents/skills/maensk-setup/SKILL.md" ] || fail "piped install copied no skill"
 [ ! -e "$HOME/.claude/skills" ] || fail "piped install for pi wrote Claude Code skills"
 [ "$(cat "$tmp/pi.log")" = "install npm:@tintinweb/pi-subagents" ] || fail "a pi install did not install pi-subagents alone"
+[ ! -e "$reviewers" ] || fail "an install without --review-tools fetched the reviewers"
 
 if script --version >/dev/null 2>&1; then
-  printf 'y\ny\nn\n%s\n\n\n' "$tmp/vault" | script -qec "$origin/install.sh" /dev/null >/dev/null
+  printf 'y\ny\nn\n%s\n\n\ny\n' "$tmp/vault" | script -qec "$origin/install.sh" /dev/null >/dev/null
+  pinned "a yes to the reviewers question"
+  rm -rf "$reviewers"
+  printf 'y\ny\nn\n%s\n\n\n\n' "$tmp/vault" | script -qec "$origin/install.sh" /dev/null >/dev/null
+  [ ! -e "$reviewers" ] || fail "an empty answer to the reviewers question fetched the reviewers"
   [ -f "$HOME/.claude/skills/maensk-setup/SKILL.md" ] || fail "answered install copied no skill"
   [ ! -e "$tmp/vault/.claude" ] || fail "an empty repos answer still wrote vault settings"
   grep -q '"repos": null' "$config" || fail "an empty repos answer was not recorded"
@@ -88,6 +128,7 @@ assert local == {"permissions": {"allow": [f"Edit(/{tmp}/repos/**)"]}}, local
 config = json.loads((home / ".config/maensk/config.json").read_text())
 assert config == {"vault": f"{tmp}/vault", "repos": f"{tmp}/repos"}, config
 PY
+[ ! -e "$reviewers" ] || fail "an install without --review-tools fetched the reviewers"
 [ -x "$clone/install.sh" ] || fail "no clone for the updater"
 case "$(uname -s)" in
   Linux)
@@ -121,6 +162,34 @@ cp "$config" "$tmp/config.before"
 cmp -s "$settings" "$tmp/settings.before" || fail "a second install changed the Claude settings"
 cmp -s "$config" "$tmp/config.before" || fail "a second install changed the config"
 
+: >"$tmp/pi.log"
+"$origin/install.sh" --claude --pi --review-tools --vault "$tmp/vault" --repos "$tmp/repos" >/dev/null
+pinned "--review-tools"
+grep -qx "install npm:pi-web-search" "$tmp/pi.log" || fail "--pi --review-tools did not install pi-web-search"
+: >"$tmp/pi.log"
+git init -q "$tmp/decoy"
+cp "$tmp/decoy/.git/config" "$tmp/decoy.config"
+GIT_DIR="$tmp/decoy/.git" GIT_WORK_TREE="$tmp/decoy" "$origin/install.sh" --claude --review-tools --vault "$tmp/vault" --repos "$tmp/repos" >/dev/null
+cmp -s "$tmp/decoy/.git/config" "$tmp/decoy.config" || fail "an install with GIT_DIR set changed that repo's git config"
+pinned "GIT_DIR set"
+! grep -q pi-web-search "$tmp/pi.log" || fail "--review-tools without --pi installed pi-web-search"
+
+sed "s|file://$tmp/upstream/security-review |file://$tmp/upstream/missing |" "$origin/install.sh" >"$tmp/missing.sh"
+rm -rf "$reviewers" "$config" "$XDG_CONFIG_HOME/systemd" "$HOME/Library/LaunchAgents"
+mkdir -p "$tmp/scratch"
+out="$(TMPDIR="$tmp/scratch" bash "$tmp/missing.sh" --claude --review-tools --vault "$tmp/vault" --repos "$tmp/repos" 2>&1)" ||
+  fail "a reviewer that could not be fetched stopped the install"
+[ -f "$config" ] || fail "a reviewer that could not be fetched left no config"
+[ -f "$XDG_CONFIG_HOME/systemd/user/maensk-update.timer" ] || [ -f "$HOME/Library/LaunchAgents/io.github.tsadoq.maensk-update.plist" ] ||
+  fail "a reviewer that could not be fetched left no timer"
+[ "$(cat "$reviewers/code-review/SKILL.md")" = "pinned code-review" ] || fail "a reviewer that could not be fetched stopped the others"
+[ "$(cat "$reviewers/ponytail-review/SKILL.md")" = "pinned ponytail-review" ] || fail "a reviewer that could not be fetched stopped the others"
+grep security-review <<<"$out" | grep -qv '^installed' || fail "no line names the reviewer that could not be installed"
+[ -z "$(ls -A "$tmp/scratch")" ] || fail "a reviewer that could not be fetched left its temp folder"
+echo changed >"$reviewers/code-review/SKILL.md"
+echo stray >"$reviewers/code-review/stray"
+rm -rf "$reviewers/security-review"
+
 echo '{"vault": "/v", "repos": null, "layout": {"glossary": {"path": "g.md"}}}' >"$config"
 cp "$config" "$tmp/config.before"
 mkdir -p "$HOME/.claude/skills/mine" "$origin/skills/second"
@@ -136,6 +205,12 @@ for skills in "$HOME/.claude/skills" "$HOME/.agents/skills"; do
 done
 [ "$(cat "$HOME/.claude/skills/mine/keep")" = keep ] || fail "update touched a folder it does not own"
 cmp -s "$config" "$tmp/config.before" || fail "update changed the config"
+[ "$(cat "$reviewers/code-review/SKILL.md")" = "pinned code-review" ] || fail "update did not restore a changed reviewer folder"
+[ ! -e "$reviewers/code-review/stray" ] || fail "update left a file that is not in the pinned folder"
+[ ! -e "$reviewers/security-review" ] || fail "update created a reviewer folder that was not there"
+rm -rf "$reviewers"
+"${detach[@]}" "$clone/install.sh" --update </dev/null >/dev/null
+[ ! -e "$reviewers" ] || fail "update created the reviewers folder"
 
 printf '{' >"$settings"
 if "$origin/install.sh" --claude --vault "$tmp/vault" >/dev/null 2>&1; then fail "installed over broken settings"; fi
@@ -149,5 +224,9 @@ if "${detach[@]}" "$clone/install.sh" --update </dev/null >/dev/null 2>&1; then 
 [ -f "$HOME/.claude/skills/second/SKILL.md" ] || fail "a refused update removed installed skills"
 
 if "${detach[@]}" "$origin/install.sh" </dev/null >/dev/null 2>&1; then fail "asked questions with no terminal"; fi
+
+sed -n '/^REVIEWERS=(/,/^)/p' "$root/install.sh" | grep -o '"[^"]*"' | tr -d '"' |
+  awk 'NF == 4 { n++ } END { exit !(n == 3 && NR == 3) }' ||
+  fail "the REVIEWERS array does not read as three entries of four fields"
 
 echo "install.sh: all checks passed"
